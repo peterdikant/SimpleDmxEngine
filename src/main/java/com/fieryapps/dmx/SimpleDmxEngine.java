@@ -25,12 +25,12 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
 
-import com.fieryapps.dmx.engine.OlaClientDmxStream;
 import org.yaml.snakeyaml.Yaml;
 
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
 import com.fieryapps.dmx.beans.Show;
+import com.fieryapps.dmx.engine.DmxStreams;
 import com.fieryapps.dmx.engine.Engine;
 
 /**
@@ -49,17 +49,26 @@ public class SimpleDmxEngine
 	 * file is loaded, the engine is started.
 	 */
 	public void run() {
+		Show show = null;
+
 		try {
 			InputStream input = new FileInputStream(showFile);
 			Yaml yaml = new Yaml();
-			Show show = yaml.loadAs(input, Show.class);
+			show = yaml.loadAs(input, Show.class);
 			input.close();
-			Engine engine = new Engine(show, new OlaClientDmxStream());
-			engine.run();
 		} catch (FileNotFoundException e) {
 			System.err.println("Error opening show file '" + showFile + "': " + e.getMessage());
 		} catch (Exception e) {
 			System.err.println("Error starting application: " + e.getMessage());
+		}
+		
+		try (DmxStream dmxStream = DmxStreams.createStreamFor(show)) {
+			Engine engine = new Engine(show, dmxStream);
+			engine.run();
+		} catch (Exception e) {
+			System.err.println("Error starting application: " + e.getMessage());
+			e.printStackTrace(System.err);
+			System.exit(1);
 		}
 	}
 	

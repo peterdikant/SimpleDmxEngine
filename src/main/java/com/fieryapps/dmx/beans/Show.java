@@ -29,6 +29,7 @@ import java.util.List;
 public class Show {
 	// name of the light show
 	private String name;
+	private Artnet artnet;
 	// the OLA universe id to send DMX values to
 	private short universe;
 	// duration of a frame in milliseconds
@@ -46,6 +47,14 @@ public class Show {
 	
 	public void setName(String name) {
 		this.name = name;
+	}
+	
+	public Artnet getArtnet() {
+		return artnet;
+	}
+	
+	public void setArtnet(Artnet artnet) {
+		this.artnet = artnet;
 	}
 	
 	public short getUniverse() {
