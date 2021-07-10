@@ -83,6 +83,7 @@ public class Engine {
 		keyQueue = new ConcurrentLinkedQueue<Integer>();
 		reader = new KeyboardReader(keyQueue);
 		Thread t = new Thread(reader);
+		t.setDaemon(true);
 		t.start();
 	}
 	
@@ -270,7 +271,7 @@ public class Engine {
 	private static class KeyboardReader implements Runnable {
 		
 		private final ConcurrentLinkedQueue<Integer> keyQueue;
-		private boolean stop;
+		private volatile boolean stop;
 		private ConsoleReader console;
 		
 		/**
