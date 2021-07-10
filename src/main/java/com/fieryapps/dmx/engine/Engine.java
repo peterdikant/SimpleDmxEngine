@@ -108,7 +108,7 @@ public class Engine {
 				try {
 					Thread.sleep(show.getFrameDuration() - timeDelta);
 				} catch(InterruptedException e) {
-					e.printStackTrace();
+					e.printStackTrace(System.err);
 				}
 			} else {
 				System.out.println("Slow frame encountered: " + timeDelta + " ms");
@@ -286,7 +286,7 @@ public class Engine {
 				TerminalFactory.get().init();
 				console = new ConsoleReader();
 			} catch (Exception e) {
-				e.printStackTrace();
+				e.printStackTrace(System.err);
 			}
 		}
 
@@ -302,12 +302,12 @@ public class Engine {
 					}
 				}
 			} catch (IOException e) {
-				e.printStackTrace();
+				e.printStackTrace(System.err);
 			} finally {
 				try {
 					TerminalFactory.get().restore();
 				} catch (Exception e) {
-					e.printStackTrace();
+					e.printStackTrace(System.err);
 				}
 			}
 		}
