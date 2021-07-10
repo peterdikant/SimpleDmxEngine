@@ -43,7 +43,7 @@ import com.fieryapps.dmx.beans.Step;
 public class Engine {
 	
 	private final Show show;
-	private short[] currentFrame = new short[512];
+	private final short[] currentFrame = new short[512];
 	private long fadeFrames;
 	private long holdFrames;
 	private short nextStep;
@@ -52,10 +52,10 @@ public class Engine {
 	// master dimmer to change overall brightness in 10 steps
 	private short dimmer;
 	private Scene currentScene;
-	private ConcurrentLinkedQueue<Integer> keyQueue;
-	private KeyboardReader reader;
+	private final ConcurrentLinkedQueue<Integer> keyQueue;
+	private final KeyboardReader reader;
 	private boolean stop;
-	private OlaClient ola;
+	private final OlaClient ola;
 	
 	/**
 	 * Initialize the engine with a loaded show file. Setup connection to OLA and start
@@ -102,7 +102,7 @@ public class Engine {
 			computeCurrentFrame();
 			ola.streamDmx(show.getUniverse(), currentFrame);
 			// time is converted to ms
-			timeDelta = Math.round((System.nanoTime() - startTime) / 1000000);
+			timeDelta = Math.round((System.nanoTime() - startTime) / 1000000d);
 			if (timeDelta < show.getFrameDuration()) { 
 				try {
 					Thread.sleep(show.getFrameDuration() - timeDelta);
@@ -161,9 +161,9 @@ public class Engine {
 		rendered = false;
 		// how many frames do we need to hold and fade in this step?
 		holdFrames = Math.round(currentScene.getSteps().get(nextStep).getHold() 
-				/ show.getFrameDuration());
+				/ (1d * show.getFrameDuration()));
 		fadeFrames = Math.round(currentScene.getSteps().get(nextStep).getFade() 
-				/ show.getFrameDuration());
+				/ (1d * show.getFrameDuration()));
 		
 		System.out.format("Playing scene: %-20s Step: %02d/%02d\n", 
 				currentScene.getName(), nextStep + 1, currentScene.getSteps().size());
@@ -178,12 +178,12 @@ public class Engine {
 		if (fadeFrames > 0) {
 			// we are still fading to the target values
 			for (int i = 0; i < targetStep.getValues().size(); i++) {	
-				if (show.getDimmerChannels().contains(Short.valueOf((short)(i + 1)))) {
+				if (show.getDimmerChannels().contains((short) (i + 1))) {
 					// this is a dimmer channel, the target value needs to be modified 
 					// by the dimmer value
 					short targetValue = (short)Math.round(targetStep.getValues().get(i) 
-							* dimmer / 10);
-					currentFrame[i] += Math.round((targetValue - currentFrame[i]) / fadeFrames);
+							* dimmer / 10f);
+					currentFrame[i] += Math.round((targetValue - currentFrame[i]) / (1f * fadeFrames));
 				} else {
 					if (currentScene.getSwitchChannels().contains((short)(i + 1))) {
 						// don't fade this channel
@@ -191,7 +191,7 @@ public class Engine {
 					} else {
 						// this is a fader channel, fade value
 						currentFrame[i] += Math.round((targetStep.getValues().get(i) 
-								- currentFrame[i]) / fadeFrames);
+								- currentFrame[i]) / (1f * fadeFrames));
 					}
 				}
 			}
@@ -209,7 +209,7 @@ public class Engine {
 			// user might change the dimmer setting at any time
 			for (short dmxAddress: show.getDimmerChannels()) {
 				currentFrame[dmxAddress - 1] = (short)Math.round(
-						targetStep.getValues().get(dmxAddress - 1) * dimmer / 10);
+						targetStep.getValues().get(dmxAddress - 1) * dimmer / 10f);
 			}
 			if (holdFrames > 0) {
 				holdFrames--;
@@ -254,7 +254,7 @@ public class Engine {
 					}
 				}
 				if (!actionTriggered) {
-					System.out.println("Unknown key pressed: " + key.intValue());
+					System.out.println("Unknown key pressed: " + key);
 				}
 			}
 		}
@@ -269,7 +269,7 @@ public class Engine {
 	 */
 	private static class KeyboardReader implements Runnable {
 		
-		private ConcurrentLinkedQueue<Integer> keyQueue;
+		private final ConcurrentLinkedQueue<Integer> keyQueue;
 		private boolean stop;
 		private ConsoleReader console;
 		
@@ -297,7 +297,7 @@ public class Engine {
 				while (!stop) {
 					int key = console.readCharacter();
 					if (key >= 0) {
-						keyQueue.offer(Integer.valueOf(key));
+						keyQueue.offer(key);
 					}
 				}
 			} catch (IOException e) {
