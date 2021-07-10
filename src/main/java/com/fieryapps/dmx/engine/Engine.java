@@ -111,7 +111,7 @@ public class Engine {
 					e.printStackTrace(System.err);
 				}
 			} else {
-				System.out.println("Slow frame encountered: " + timeDelta + " ms");
+				System.out.print("\rSlow frame encountered: " + timeDelta + " ms");
 			}
 		}
 	}
@@ -166,7 +166,7 @@ public class Engine {
 		fadeFrames = Math.round(currentScene.getSteps().get(nextStep).getFade() 
 				/ (1d * show.getFrameDuration()));
 		
-		System.out.format("Playing scene: %-20s Step: %02d/%02d\n", 
+		System.out.format("\rPlaying scene: %-20s Step: %02d/%02d",
 				currentScene.getName(), nextStep + 1, currentScene.getSteps().size());
 	}
 	
@@ -227,36 +227,41 @@ public class Engine {
 	private void checkUserInput() {
 		Integer key = keyQueue.poll();
 		if (key != null) {
-			if (key == 113) {
-				// stop
-				System.out.println("Shutting down...");
-				stop = true;
-				reader.stopThread();
-			} else if (key == 43) {
-				// plus
-				if (dimmer < 10) {
-					dimmer++;
-					System.out.println("Dimmer: " + dimmer);
-				}
-			} else if (key == 45) {
-				// minus
-				if (dimmer > 0) {
-					dimmer--;
-					System.out.println("Dimmer: " + dimmer);
-				}
-			} else {
-				boolean actionTriggered = false;
-				for (Scene scene: show.getScenes()) {
-					if (scene.getTriggerKeys().contains(key)) {
-						currentScene = scene;
-						progressStep(true);
-						actionTriggered = true;
-						break;
+			switch (key) {
+				case (int) 'q':
+					System.out.println("\nShutting down...");
+					stop = true;
+					reader.stopThread();
+					break;
+				
+				case (int) '+':
+					if (dimmer < 10) {
+						dimmer++;
+						System.out.print("\rDimmer: " + 10 * dimmer + "%");
 					}
-				}
-				if (!actionTriggered) {
-					System.out.println("Unknown key pressed: " + key);
-				}
+					break;
+				
+				case (int) '-':
+					if (dimmer > 0) {
+						dimmer--;
+						System.out.print("\rDimmer: " + 10 * dimmer + "%");
+					}
+					break;
+				
+				default:
+					boolean actionTriggered = false;
+					for (Scene scene : show.getScenes()) {
+						if (scene.getTriggerKeys().contains(key)) {
+							currentScene = scene;
+							progressStep(true);
+							actionTriggered = true;
+							break;
+						}
+					}
+					if (!actionTriggered) {
+						System.out.print("\rUnknown key pressed: " + key);
+					}
+					break;
 			}
 		}
 	}
