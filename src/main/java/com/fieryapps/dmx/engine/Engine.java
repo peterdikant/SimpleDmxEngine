@@ -26,7 +26,7 @@ import java.io.IOException;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ThreadLocalRandom;
 
-import ola.OlaClient;
+import com.fieryapps.dmx.DmxStream;
 
 import jline.TerminalFactory;
 import jline.console.ConsoleReader;
@@ -43,6 +43,8 @@ import com.fieryapps.dmx.beans.Step;
 public class Engine {
 	
 	private final Show show;
+	private final DmxStream dmxStream;
+	
 	private final short[] currentFrame = new short[512];
 	private long fadeFrames;
 	private long holdFrames;
@@ -55,16 +57,14 @@ public class Engine {
 	private final ConcurrentLinkedQueue<Integer> keyQueue;
 	private final KeyboardReader reader;
 	private boolean stop;
-	private final OlaClient ola;
 	
 	/**
-	 * Initialize the engine with a loaded show file. Setup connection to OLA and start
+	 * Initialize the engine with a loaded show file, a DmxStream and start
 	 * a new thread to monitor keyboard input.
 	 * 
 	 * @param show represents the show file
-	 * @throws Exception thrown if the intialization of OLA fails.
 	 */
-	public Engine(Show show) throws Exception {
+	public Engine(Show show, DmxStream dmxStream) {
 		this.show = show;
 		for (int i = 0; i < 512; i++) {
 			currentFrame[i] = 0;
@@ -78,7 +78,7 @@ public class Engine {
 		currentScene = show.getScenes().get(show.getStartScene() - 1);
 		progressStep(true);
 		
-		ola = new OlaClient();
+		this.dmxStream = dmxStream;
 		
 		keyQueue = new ConcurrentLinkedQueue<Integer>();
 		reader = new KeyboardReader(keyQueue);
@@ -100,7 +100,7 @@ public class Engine {
 			startTime = System.nanoTime();
 			checkUserInput();
 			computeCurrentFrame();
-			ola.streamDmx(show.getUniverse(), currentFrame);
+			dmxStream.streamDmx(show.getUniverse(), currentFrame);
 			// time is converted to ms
 			timeDelta = Math.round((System.nanoTime() - startTime) / 1000000d);
 			if (timeDelta < show.getFrameDuration()) { 

@@ -25,6 +25,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
 
+import com.fieryapps.dmx.engine.OlaClientDmxStream;
 import org.yaml.snakeyaml.Yaml;
 
 import com.beust.jcommander.JCommander;
@@ -53,7 +54,7 @@ public class SimpleDmxEngine
 			Yaml yaml = new Yaml();
 			Show show = yaml.loadAs(input, Show.class);
 			input.close();
-			Engine engine = new Engine(show);
+			Engine engine = new Engine(show, new OlaClientDmxStream());
 			engine.run();
 		} catch (FileNotFoundException e) {
 			System.err.println("Error opening show file '" + showFile + "': " + e.getMessage());
