@@ -26,7 +26,7 @@ import java.io.IOException;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ThreadLocalRandom;
 
-import ola.OlaClient;
+import com.fieryapps.dmx.DmxStream;
 
 import jline.TerminalFactory;
 import jline.console.ConsoleReader;
@@ -43,7 +43,9 @@ import com.fieryapps.dmx.beans.Step;
 public class Engine {
 	
 	private final Show show;
-	private short[] currentFrame = new short[512];
+	private final DmxStream dmxStream;
+	
+	private final short[] currentFrame = new short[512];
 	private long fadeFrames;
 	private long holdFrames;
 	private short nextStep;
@@ -52,19 +54,17 @@ public class Engine {
 	// master dimmer to change overall brightness in 10 steps
 	private short dimmer;
 	private Scene currentScene;
-	private ConcurrentLinkedQueue<Integer> keyQueue;
-	private KeyboardReader reader;
+	private final ConcurrentLinkedQueue<Integer> keyQueue;
+	private final KeyboardReader reader;
 	private boolean stop;
-	private OlaClient ola;
 	
 	/**
-	 * Initialize the engine with a loaded show file. Setup connection to OLA and start
+	 * Initialize the engine with a loaded show file, a DmxStream and start
 	 * a new thread to monitor keyboard input.
 	 * 
 	 * @param show represents the show file
-	 * @throws Exception thrown if the intialization of OLA fails.
 	 */
-	public Engine(Show show) throws Exception {
+	public Engine(Show show, DmxStream dmxStream) {
 		this.show = show;
 		for (int i = 0; i < 512; i++) {
 			currentFrame[i] = 0;
@@ -78,11 +78,12 @@ public class Engine {
 		currentScene = show.getScenes().get(show.getStartScene() - 1);
 		progressStep(true);
 		
-		ola = new OlaClient();
+		this.dmxStream = dmxStream;
 		
 		keyQueue = new ConcurrentLinkedQueue<Integer>();
 		reader = new KeyboardReader(keyQueue);
 		Thread t = new Thread(reader);
+		t.setDaemon(true);
 		t.start();
 	}
 	
@@ -100,17 +101,17 @@ public class Engine {
 			startTime = System.nanoTime();
 			checkUserInput();
 			computeCurrentFrame();
-			ola.streamDmx(show.getUniverse(), currentFrame);
+			dmxStream.streamDmx(show.getUniverse(), currentFrame);
 			// time is converted to ms
-			timeDelta = Math.round((System.nanoTime() - startTime) / 1000000);
+			timeDelta = Math.round((System.nanoTime() - startTime) / 1000000d);
 			if (timeDelta < show.getFrameDuration()) { 
 				try {
 					Thread.sleep(show.getFrameDuration() - timeDelta);
 				} catch(InterruptedException e) {
-					e.printStackTrace();
+					e.printStackTrace(System.err);
 				}
 			} else {
-				System.out.println("Slow frame encountered: " + timeDelta + " ms");
+				System.out.print("\rSlow frame encountered: " + timeDelta + " ms");
 			}
 		}
 	}
@@ -161,11 +162,11 @@ public class Engine {
 		rendered = false;
 		// how many frames do we need to hold and fade in this step?
 		holdFrames = Math.round(currentScene.getSteps().get(nextStep).getHold() 
-				/ show.getFrameDuration());
+				/ (1d * show.getFrameDuration()));
 		fadeFrames = Math.round(currentScene.getSteps().get(nextStep).getFade() 
-				/ show.getFrameDuration());
+				/ (1d * show.getFrameDuration()));
 		
-		System.out.format("Playing scene: %-20s Step: %02d/%02d\n", 
+		System.out.format("\rPlaying scene: %-20s Step: %02d/%02d",
 				currentScene.getName(), nextStep + 1, currentScene.getSteps().size());
 	}
 	
@@ -178,12 +179,12 @@ public class Engine {
 		if (fadeFrames > 0) {
 			// we are still fading to the target values
 			for (int i = 0; i < targetStep.getValues().size(); i++) {	
-				if (show.getDimmerChannels().contains(Short.valueOf((short)(i + 1)))) {
+				if (show.getDimmerChannels().contains((short) (i + 1))) {
 					// this is a dimmer channel, the target value needs to be modified 
 					// by the dimmer value
 					short targetValue = (short)Math.round(targetStep.getValues().get(i) 
-							* dimmer / 10);
-					currentFrame[i] += Math.round((targetValue - currentFrame[i]) / fadeFrames);
+							* dimmer / 10f);
+					currentFrame[i] += Math.round((targetValue - currentFrame[i]) / (1f * fadeFrames));
 				} else {
 					if (currentScene.getSwitchChannels().contains((short)(i + 1))) {
 						// don't fade this channel
@@ -191,7 +192,7 @@ public class Engine {
 					} else {
 						// this is a fader channel, fade value
 						currentFrame[i] += Math.round((targetStep.getValues().get(i) 
-								- currentFrame[i]) / fadeFrames);
+								- currentFrame[i]) / (1f * fadeFrames));
 					}
 				}
 			}
@@ -209,7 +210,7 @@ public class Engine {
 			// user might change the dimmer setting at any time
 			for (short dmxAddress: show.getDimmerChannels()) {
 				currentFrame[dmxAddress - 1] = (short)Math.round(
-						targetStep.getValues().get(dmxAddress - 1) * dimmer / 10);
+						targetStep.getValues().get(dmxAddress - 1) * dimmer / 10f);
 			}
 			if (holdFrames > 0) {
 				holdFrames--;
@@ -226,36 +227,41 @@ public class Engine {
 	private void checkUserInput() {
 		Integer key = keyQueue.poll();
 		if (key != null) {
-			if (key == 113) {
-				// stop
-				System.out.println("Shutting down...");
-				stop = true;
-				reader.stopThread();
-			} else if (key == 43) {
-				// plus
-				if (dimmer < 10) {
-					dimmer++;
-					System.out.println("Dimmer: " + dimmer);
-				}
-			} else if (key == 45) {
-				// minus
-				if (dimmer > 0) {
-					dimmer--;
-					System.out.println("Dimmer: " + dimmer);
-				}
-			} else {
-				boolean actionTriggered = false;
-				for (Scene scene: show.getScenes()) {
-					if (scene.getTriggerKeys().contains(key)) {
-						currentScene = scene;
-						progressStep(true);
-						actionTriggered = true;
-						break;
+			switch (key) {
+				case (int) 'q':
+					System.out.println("\nShutting down...");
+					stop = true;
+					reader.stopThread();
+					break;
+				
+				case (int) '+':
+					if (dimmer < 10) {
+						dimmer++;
+						System.out.print("\rDimmer: " + 10 * dimmer + "%");
 					}
-				}
-				if (!actionTriggered) {
-					System.out.println("Unknown key pressed: " + key.intValue());
-				}
+					break;
+				
+				case (int) '-':
+					if (dimmer > 0) {
+						dimmer--;
+						System.out.print("\rDimmer: " + 10 * dimmer + "%");
+					}
+					break;
+				
+				default:
+					boolean actionTriggered = false;
+					for (Scene scene : show.getScenes()) {
+						if (scene.getTriggerKeys().contains(key)) {
+							currentScene = scene;
+							progressStep(true);
+							actionTriggered = true;
+							break;
+						}
+					}
+					if (!actionTriggered) {
+						System.out.print("\rUnknown key pressed: " + key);
+					}
+					break;
 			}
 		}
 	}
@@ -269,8 +275,8 @@ public class Engine {
 	 */
 	private static class KeyboardReader implements Runnable {
 		
-		private ConcurrentLinkedQueue<Integer> keyQueue;
-		private boolean stop;
+		private final ConcurrentLinkedQueue<Integer> keyQueue;
+		private volatile boolean stop;
 		private ConsoleReader console;
 		
 		/**
@@ -285,7 +291,7 @@ public class Engine {
 				TerminalFactory.get().init();
 				console = new ConsoleReader();
 			} catch (Exception e) {
-				e.printStackTrace();
+				e.printStackTrace(System.err);
 			}
 		}
 
@@ -297,16 +303,16 @@ public class Engine {
 				while (!stop) {
 					int key = console.readCharacter();
 					if (key >= 0) {
-						keyQueue.offer(Integer.valueOf(key));
+						keyQueue.offer(key);
 					}
 				}
 			} catch (IOException e) {
-				e.printStackTrace();
+				e.printStackTrace(System.err);
 			} finally {
 				try {
 					TerminalFactory.get().restore();
 				} catch (Exception e) {
-					e.printStackTrace();
+					e.printStackTrace(System.err);
 				}
 			}
 		}

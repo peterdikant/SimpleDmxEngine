@@ -51,6 +51,11 @@
     	<artifactId>jcommander</artifactId>
     	<version>1.30</version>
     </dependency>
+    <dependency>
+      <groupId>ch.bildspur</groupId>
+      <artifactId>artnet4j</artifactId>
+      <version>0.6.2</version>
+    </dependency>
   </dependencies>
   
   <build>

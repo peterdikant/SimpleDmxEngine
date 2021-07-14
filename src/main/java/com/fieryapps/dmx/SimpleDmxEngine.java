@@ -22,14 +22,17 @@
 package com.fieryapps.dmx;
 
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.InputStream;
+import java.util.List;
 
 import org.yaml.snakeyaml.Yaml;
 
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
+import com.fieryapps.dmx.beans.Scene;
 import com.fieryapps.dmx.beans.Show;
+import com.fieryapps.dmx.engine.DmxStreams;
 import com.fieryapps.dmx.engine.Engine;
 
 /**
@@ -48,17 +51,54 @@ public class SimpleDmxEngine
 	 * file is loaded, the engine is started.
 	 */
 	public void run() {
-		try {
-			InputStream input = new FileInputStream(showFile);
+		Show show = null;
+
+		try (InputStream input = new FileInputStream(showFile)) {
 			Yaml yaml = new Yaml();
-			Show show = yaml.loadAs(input, Show.class);
-			input.close();
-			Engine engine = new Engine(show);
-			engine.run();
-		} catch (FileNotFoundException e) {
+			show = yaml.loadAs(input, Show.class);
+		} catch (IOException e) {
 			System.err.println("Error opening show file '" + showFile + "': " + e.getMessage());
+			System.exit(1);
+		}
+		
+		try (DmxStream dmxStream = DmxStreams.createStreamFor(show)) {
+			Engine engine = new Engine(show, dmxStream);
+			
+			printKeysMappings(show);
+			engine.run();
 		} catch (Exception e) {
 			System.err.println("Error starting application: " + e.getMessage());
+			e.printStackTrace(System.err);
+			System.exit(1);
+		}
+	}
+	
+	private void printKeysMappings(Show show) {
+		System.out.println("Master Keys:");
+		System.out.println("\t[-]\t=> Dimmer -10%");
+		System.out.println("\t[+]\t=> Dimmer +10%");
+		System.out.println("\t[q]\t=> Quit");
+		
+		System.out.println("Trigger Keys:");
+		
+		for (Scene scene : show.getScenes()) {
+			System.out.print("\t[");
+			
+			List<Integer> triggerKeys = scene.getTriggerKeys();
+			for (int i = 0; i < triggerKeys.size(); i++) {
+				if (i > 0) {
+					System.out.print(", ");
+				}
+				int triggerKey = triggerKeys.get(i);
+				
+				if (triggerKey < 33) {
+					System.out.print("0x" + Integer.toHexString(triggerKey));
+				} else {
+					System.out.print((char) triggerKey);
+				}
+			}
+			
+			System.out.println("]\t=> " + scene.getName());
 		}
 	}
 	

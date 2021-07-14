@@ -10,6 +10,13 @@
 # Revo IV: mode, chase, speed, strobe
 
 name: Example Lightshow
+
+# Send DMX over Artnet
+#artnet:
+#  # optional for sending unicast (if not set, DMX will be broadcasted)
+#  address: ip-address
+#  subnet: 0
+
 universe: 1
 # we are running 25 frames per second, one frame is 40 milliseconds long
 frameDuration: 40 
